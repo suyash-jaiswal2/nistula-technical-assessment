@@ -99,3 +99,7 @@ represents how suitable the AI draft is for sending without human review.
   per-channel adapters to map to the unified schema before any processing.
 - **API key** is loaded from `.env` via `python-dotenv` and never
   hardcoded or logged.
+
+
+  ## Known Limitation
+  - The classifier will misclassify some edge cases (a message saying "I'm not happy with the rate" hits complaint before   pricing). In production, we can train a lightweight ML model for classification instead of the current bag of words model.
