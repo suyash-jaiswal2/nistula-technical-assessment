@@ -1,6 +1,10 @@
 import os
+import logging
 import anthropic
+from groq import Groq
 from models import NormalizedMessage
+
+logger = logging.getLogger(__name__)
 
 PROPERTY_CONTEXT = """
 Property: Villa B1, Assagao, North Goa
@@ -30,10 +34,8 @@ Guidelines:
 """
 
 
-def get_drafted_reply(msg: NormalizedMessage) -> str:
-    client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-
-    user_prompt = f"""Guest name: {msg.guest_name}
+def _build_user_prompt(msg: NormalizedMessage) -> str:
+    return f"""Guest name: {msg.guest_name}
 Source channel: {msg.source}
 Query type: {msg.query_type}
 Booking reference: {msg.booking_ref or "Not provided"}
@@ -41,11 +43,49 @@ Message: {msg.message_text}
 
 Draft a reply to this guest message."""
 
+
+def _try_anthropic(user_prompt: str) -> str:
+    client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
     response = client.messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=500,
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user_prompt}],
     )
-
     return response.content[0].text
+
+
+def _try_groq(user_prompt: str) -> str:
+    client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        max_tokens=500,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_prompt},
+        ],
+    )
+    return response.choices[0].message.content
+
+
+def get_drafted_reply(msg: NormalizedMessage) -> tuple[str, str]:
+    """
+    Returns (drafted_reply, provider_used).
+    Tries Anthropic first. If it fails for any reason, falls back to Groq.
+    """
+    user_prompt = _build_user_prompt(msg)
+
+    try:
+        reply = _try_anthropic(user_prompt)
+        logger.info("Reply generated via Anthropic.")
+        return reply, "anthropic"
+    except Exception as e:
+        logger.warning(f"Anthropic failed ({e}). Falling back to Groq.")
+
+    try:
+        reply = _try_groq(user_prompt)
+        logger.info("Reply generated via Groq (fallback).")
+        return reply, "groq"
+    except Exception as e:
+        logger.error(f"Groq also failed: {e}")
+        raise RuntimeError("Both Anthropic and Groq are unavailable.") from e

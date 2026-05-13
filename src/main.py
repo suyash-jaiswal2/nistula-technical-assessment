@@ -83,7 +83,7 @@ async def handle_message(payload: InboundMessage):
         message_id = str(uuid.uuid4())
         query_type = classify_query(payload.message)
         normalized = normalize(payload, message_id, query_type)
-        drafted_reply = get_drafted_reply(normalized)
+        drafted_reply, provider = get_drafted_reply(normalized)
         confidence = compute_confidence(query_type, drafted_reply)
         action = determine_action(query_type, confidence)
 
@@ -93,6 +93,7 @@ async def handle_message(payload: InboundMessage):
             "drafted_reply": drafted_reply,
             "confidence_score": confidence,
             "action": action,
+            "provider": provider,   # "anthropic" or "groq" — useful to show in demo
         }
 
     except Exception as e:

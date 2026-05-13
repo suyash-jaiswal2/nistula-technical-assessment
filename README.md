@@ -6,7 +6,7 @@
 cd src
 pip install -r requirements.txt
 cp ../.env.example ../.env
-# Add your ANTHROPIC_API_KEY to .env
+# Add your ANTHROPIC_API_KEY and GROQ_API_KEY for fallback to .env
 uvicorn main:app --reload
 ```
 
